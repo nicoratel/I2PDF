@@ -331,15 +331,33 @@ def compute_ePDF(
         qvalues=True,
         xray=False,
     )
+    q_f, favg = compute_avg_scattering_factor(
+        composition,
+        x_max=qmax,
+        x_step=qstep,
+        qvalues=True,
+        xray=False,
+    )
     f2avg = np.interp(q, q_f2, f2avg)
+    favg = np.interp(q, q_f, favg)
+    favg2 = favg**2
 
-    mask_inf = q > 0.9 * qmax
-    I_inf = np.mean(Iexp[mask_inf])
+    # Estimate absolute scale alpha from high-Q behaviour: alpha*I(Q) -> <f^2>(Q).
+    finite = np.isfinite(Iexp) & np.isfinite(f2avg) & np.isfinite(favg2) & (favg2 > 0)
+    mask_inf = finite & (q > 0.9 * qmax)
+    if np.any(mask_inf):
+        den = np.mean(Iexp[mask_inf])
+        num = np.mean(f2avg[mask_inf])
+    else:
+        den = np.mean(Iexp[finite])
+        num = np.mean(f2avg[finite])
+    alpha = num / den if den != 0 else 1.0
 
-    Inorm = Iexp / f2avg
+    # Reduced structure function via S(Q)-1 = (alpha*I - <f^2>) / <f>^2
+    Sminus1 = (alpha * Iexp - f2avg) / np.maximum(favg2, np.finfo(float).eps)
 
     # --- Modified intensity F(Q) ---
-    Fm = q * (Inorm / I_inf - 1)
+    Fm = q * Sminus1
 
     # --- Polynomial background (PDFgetX3 philosophy) ---
     background = fit_polynomial_background(
@@ -526,15 +544,33 @@ def compute_xPDF(
         qvalues=True,
         xray=True,
     )
+    q_f, favg = compute_avg_scattering_factor(
+        composition,
+        x_max=qmax,
+        x_step=qstep,
+        qvalues=True,
+        xray=True,
+    )
     f2avg = np.interp(q, q_f2, f2avg)
+    favg = np.interp(q, q_f, favg)
+    favg2 = favg**2
 
-    mask_inf = q > 0.9 * qmax
-    I_inf = np.mean(Iexp[mask_inf])
+    # Estimate absolute scale alpha from high-Q behaviour: alpha*I(Q) -> <f^2>(Q).
+    finite = np.isfinite(Iexp) & np.isfinite(f2avg) & np.isfinite(favg2) & (favg2 > 0)
+    mask_inf = finite & (q > 0.9 * qmax)
+    if np.any(mask_inf):
+        den = np.mean(Iexp[mask_inf])
+        num = np.mean(f2avg[mask_inf])
+    else:
+        den = np.mean(Iexp[finite])
+        num = np.mean(f2avg[finite])
+    alpha = num / den if den != 0 else 1.0
 
-    Inorm = Iexp / f2avg
+    # Reduced structure function via S(Q)-1 = (alpha*I - <f^2>) / <f>^2
+    Sminus1 = (alpha * Iexp - f2avg) / np.maximum(favg2, np.finfo(float).eps)
 
     # --- Modified intensity F(Q) ---
-    Fm = q * (Inorm / I_inf - 1)
+    Fm = q * Sminus1
 
     # --- Polynomial background (PDFgetX3 philosophy) ---
     background = fit_polynomial_background(

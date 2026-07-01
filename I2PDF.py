@@ -13,12 +13,12 @@ if 'ref_processor' not in st.session_state:
 
 # Configure Streamlit page
 st.set_page_config(
-    page_title="I2PDF - Interactive GUI",
+    page_title="IPDF - Interactive GUI",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-st.title("I2PDF - Interactive PDF Extraction")
+st.title("Interactive PDF Extraction")
 
 # Add CSS to style tab labels and reduce content font size
 st.markdown("""
@@ -337,7 +337,11 @@ with tab2:
         csv_content = csv_buffer.getvalue().encode('utf-8')
         
         # Import functions for intermediate calculations
-        from pdf_extraction import compute_f2avg, fit_polynomial_background
+        from pdf_extraction import (
+            compute_avg_scattering_factor,
+            compute_f2avg,
+            fit_polynomial_background,
+        )
         
         # Display plots in RIGHT column
         with col_plots:
@@ -352,23 +356,46 @@ with tab2:
                 x_max=qmax_int,
                 x_step=qstep,
                 qvalues=True,
-                xray=True,
+                xray=(radiation_type == "X-ray"),
+            )
+            q_f, favg = compute_avg_scattering_factor(
+                formula=st.session_state.composition,
+                x_max=qmax_int,
+                x_step=qstep,
+                qvalues=True,
+                xray=(radiation_type == "X-ray"),
             )
             f2avg_interp = np.interp(q, q_f2, f2avg)
+            favg_interp = np.interp(q, q_f, favg)
+            favg2_interp = favg_interp**2
             
             # Modified intensity for plot 2
             Iexp_corrected = Iexp_orig.copy()
             if I_ref is not None:
                 Iexp_corrected = Iexp_corrected - bgscale_int * I_ref
-            
-            mask_inf = q > 0.9 * qmax_int
-            I_inf = np.mean(Iexp_corrected[mask_inf])
-            
-            Inorm = Iexp_corrected / f2avg_interp
-            Fm = q * (Inorm / I_inf - 1)
+
+            finite = (
+                np.isfinite(Iexp_corrected)
+                & np.isfinite(f2avg_interp)
+                & np.isfinite(favg2_interp)
+                & (favg2_interp > 0)
+            )
+            mask_inf = finite & (q > 0.9 * qmax_int)
+            if np.any(mask_inf):
+                den = np.mean(Iexp_corrected[mask_inf])
+                num = np.mean(f2avg_interp[mask_inf])
+            else:
+                den = np.mean(Iexp_corrected[finite])
+                num = np.mean(f2avg_interp[finite])
+            alpha = num / den if den != 0 else 1.0
+
+            Sminus1 = (alpha * Iexp_corrected - f2avg_interp) / np.maximum(
+                favg2_interp, np.finfo(float).eps
+            )
+            Fm = q * Sminus1
             
             background = fit_polynomial_background(
-                q, Fm, rpoly=rpoly_int, qmin=qmin_int, qmax=qmax_int
+                q, Fm, rpoly=rpoly_int, qmin=qmin_int, qmax=qmaxinst_int
             )
             Fc = Fm - background
         
