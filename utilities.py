@@ -9,6 +9,12 @@ def convert_tth2q(tth, wavelength):
     q = (4 * np.pi / wavelength) * np.sin(tth_rad / 2)
     return q
 
+def convert_qnm2qA(q_nm):
+    """
+    Converts Q values from nm^-1 to A^-1.
+    """
+    return q_nm * 10.0
+
 def read_file(file_obj,wavelength = 0.71, unit="tth"):
 
     """
@@ -17,20 +23,26 @@ def read_file(file_obj,wavelength = 0.71, unit="tth"):
     wavelength: float
         Wavelength of the X-ray radiation.
     unit: str
-        Unit of the data in the file. Can be 'tth' (two-theta) or 'q' (Q values).
+        Unit of the data in the file. Can be 'tth' (two-theta) or 'q_nm' (Q values in nm^-1) or 'q_A' (Q values in A^-1).
     Reads a file and returns its content as a string.
     """
     unit = unit.lower()
-    if unit not in ["tth", "q"]:
-        raise ValueError("Unit must be either 'tth' or 'q'.")  
+    if unit not in ["tth", "q_nm","q_A"]:
+        raise ValueError("Unit must be either 'tth' or 'q_nm' or 'q_A'.")  
     elif unit == "tth":
         data = np.loadtxt(file_obj)
         tth = data[:, 0]
         intensity = data[:, 1]
         q = convert_tth2q(tth, wavelength=wavelength)
         return q, intensity
-    elif unit == "q":
+    elif unit == "q_nm":
         data = np.loadtxt(file_obj)
-        q = data[:, 0]
+        q_nm = data[:, 0]
         intensity = data[:, 1]
-        return q, intensity
+        q_A = convert_qnm2qA(q_nm)
+        return q_A, intensity
+    elif unit == "q_A":
+        data = np.loadtxt(file_obj)
+        q_A = data[:, 0]
+        intensity = data[:, 1]
+        return q_A, intensity

@@ -55,7 +55,7 @@ st.markdown("""
 # Add stop button in sidebar
 st.sidebar.markdown("---")
 if st.sidebar.button("🛑 Stop App", type="secondary"):
-    st.success("👋 Thanks for using I2PDF! Session ended.")
+    st.success("👋 Thanks for using scatt2PDF! Session ended.")
     st.stop()
 
 # Create two tabs (Define Sample/Ref first, then PDF Extraction)
@@ -87,9 +87,9 @@ with tab1:
     # Menu déroulant pour le type de données
     data_unit = st.selectbox(
         "Select data unit",
-        options=["tth", "q"],
+        options=["tth", "q_nm", "q_A"],
         index=0,
-        help="Select the unit of the data in the files: 'tth' for two-theta angles or 'q' for Q values."
+        help="Select the unit of the data in the files: 'tth' for two-theta angles or 'q_nm' or 'q_A' for Q values."
     )
     col_sample, col_ref = st.columns(2)
 
@@ -119,7 +119,7 @@ with tab1:
             ))
             fig_sample.update_layout(
                 title="Sample Data",
-                xaxis_title="Q (Å⁻¹)" if data_unit == "q" else "Two-theta (°)",
+                xaxis_title=f"{str(data_unit)}",
                 yaxis_title="Intensity",
                 hovermode='x unified',
                 showlegend=True,
@@ -157,7 +157,7 @@ with tab1:
             ))
             fig_ref.update_layout(
                 title="Reference Data",
-                xaxis_title="Q (Å⁻¹)" if data_unit == "q" else "Two-theta (°)",
+                xaxis_title=f"{str(data_unit)}",
                 yaxis_title="Intensity",
                 hovermode='x unified',
                 showlegend=True,
@@ -221,7 +221,7 @@ with tab2:
         I_ref_interp = None
     
     # Processing button
-    if st.button("🚀 Calculate PDF", type="primary"):
+    if st.button("Calculate PDF", type="primary"):
         
         
         try:
