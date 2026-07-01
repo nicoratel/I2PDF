@@ -554,7 +554,7 @@ def compute_xPDF(
         Fv = Fc[mask]
 
     integrand = Fv[None, :] * np.sin(np.outer(r, qv))
-   trapz_func = getattr(np, 'trapezoid', getattr(np, 'trapz', None))
+    trapz_func = getattr(np, 'trapezoid', getattr(np, 'trapz', None))
     G = (2 / np.pi) * trapz_func(integrand, qv, axis=1)
 
     # Optional diagnostic plots
