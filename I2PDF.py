@@ -13,7 +13,7 @@ if 'ref_processor' not in st.session_state:
 
 # Configure Streamlit page
 st.set_page_config(
-    page_title="IPDF - Interactive GUI",
+    page_title="scatt2PDF - Interactive GUI",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -522,5 +522,5 @@ with tab2:
 
 # Footer
 st.markdown("---")
-st.markdown("💡 **I2PDF** - Interactive interface for PDF analysis from X-ray/electron scattering data")
+st.markdown("💡 **scatt2PDF** - Interactive interface for PDF analysis from X-ray/electron scattering data")
 st.markdown("Developed by Nicolas Ratel-Ramond - LPCNO-CNRS - 2026")
