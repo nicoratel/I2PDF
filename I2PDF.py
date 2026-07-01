@@ -337,7 +337,7 @@ with tab2:
         csv_content = csv_buffer.getvalue().encode('utf-8')
         
         # Import functions for intermediate calculations
-        from xpdfsuite.pdf_extraction import compute_f2avg, fit_polynomial_background
+        from pdf_extraction import compute_f2avg, fit_polynomial_background
         
         # Display plots in RIGHT column
         with col_plots:
