@@ -119,7 +119,7 @@ with tab1:
             ))
             fig_sample.update_layout(
                 title="Sample Data",
-                xaxis_title=r"$q (\AA^{-1})$",
+                xaxis_title="q (Å⁻¹)",
                 yaxis_title="Intensity",
                 hovermode='x unified',
                 showlegend=True,
@@ -157,7 +157,7 @@ with tab1:
             ))
             fig_ref.update_layout(
                 title="Reference Data",
-                xaxis_title=r"$q (\AA^{-1})$",
+                xaxis_title="q (Å⁻¹)",
                 yaxis_title="Intensity",
                 hovermode='x unified',
                 showlegend=True,
