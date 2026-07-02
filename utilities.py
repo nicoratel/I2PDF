@@ -26,9 +26,9 @@ def read_file(file_obj,wavelength = 0.71, unit="tth"):
         Unit of the data in the file. Can be 'tth' (two-theta) or 'q_nm' (Q values in nm^-1) or 'q_A' (Q values in A^-1).
     Reads a file and returns its content as a string.
     """
-    unit = unit.lower()
-    if unit not in ["tth", "q_nm","q_A"]:
-        raise ValueError("Unit must be either 'tth' or 'q_nm' or 'q_A'.")  
+    unit = str(unit).strip().lower()
+    if unit not in ["tth", "q_nm", "q_a"]:
+        raise ValueError("Unit must be either 'tth' or 'q_nm' or 'q_A'.")
     elif unit == "tth":
         data = np.loadtxt(file_obj)
         tth = data[:, 0]
@@ -41,7 +41,7 @@ def read_file(file_obj,wavelength = 0.71, unit="tth"):
         intensity = data[:, 1]
         q_A = convert_qnm2qA(q_nm)
         return q_A, intensity
-    elif unit == "q_A":
+    elif unit == "q_a":
         data = np.loadtxt(file_obj)
         q_A = data[:, 0]
         intensity = data[:, 1]
