@@ -211,6 +211,81 @@ def fit_polynomial_background(q, Fm, rpoly=0.9, qmin=0.3, qmax=None):
     return q * poly(q)
 
 
+def fit_highq_scale_offset(
+    Iexp,
+    f2avg,
+    favg2,
+    q,
+    qmax,
+    highq_fraction=0.1,
+    beta_clip_fraction=0.01,
+):
+    """
+    Fit affine normalization on high-Q region.
+
+    Fit alpha from a robust high-Q linear relation, then compute beta so that
+    the high-Q mean of S(Q)-1 is close to zero.
+    Beta is clipped to a small fraction of ``<f^2>`` to avoid overfitting
+    that can artificially inflate or suppress PDF amplitude.
+
+    Returns
+    -------
+    alpha : float
+        Multiplicative scale factor.
+    beta : float
+        Additive offset in intensity units.
+    """
+    finite = np.isfinite(Iexp) & np.isfinite(f2avg) & np.isfinite(favg2) & (favg2 > 0)
+    if not np.any(finite):
+        return 1.0, 0.0
+
+    q_threshold = (1.0 - highq_fraction) * qmax
+    mask_fit = finite & (q >= q_threshold)
+    if np.count_nonzero(mask_fit) < 3:
+        mask_fit = finite
+
+    x = Iexp[mask_fit]
+    y = f2avg[mask_fit]
+    z = np.maximum(favg2[mask_fit], np.finfo(float).eps)
+
+    # Robust slope estimate alpha = cov(x, y) / var(x), less sensitive than mean ratio
+    # when high-Q mean intensity is close to zero after background subtraction.
+    x_mean = np.mean(x)
+    y_mean = np.mean(y)
+    var_x = np.mean((x - x_mean) ** 2)
+    if var_x > 0:
+        alpha = np.mean((x - x_mean) * (y - y_mean)) / var_x
+    else:
+        alpha = 1.0
+
+    # Constrain alpha around a robust magnitude ratio to avoid pathological scales.
+    x_medabs = np.median(np.abs(x))
+    y_medabs = np.median(np.abs(y))
+    alpha_ref = y_medabs / x_medabs if x_medabs > 0 else 1.0
+    if not np.isfinite(alpha_ref) or alpha_ref <= 0:
+        alpha_ref = 1.0
+    alpha_min = 0.2 * alpha_ref
+    alpha_max = 5.0 * alpha_ref
+    if not np.isfinite(alpha) or alpha <= 0:
+        alpha = alpha_ref
+    alpha = float(np.clip(alpha, alpha_min, alpha_max))
+
+    # Choose beta to enforce <S(Q)-1>_highQ ~ 0 with S-weights.
+    inv_z = 1.0 / z
+    beta = float(np.mean((y - alpha * x) * inv_z) / np.mean(inv_z))
+    if not np.isfinite(beta):
+        beta = 0.0
+
+    ref_scale = float(np.mean(np.abs(y)))
+    beta_limit = beta_clip_fraction * ref_scale
+    if np.isfinite(beta_limit) and beta_limit > 0:
+        beta = float(np.clip(beta, -beta_limit, beta_limit))
+    else:
+        beta = 0.0
+
+    return alpha, beta
+
+
 # --------------------------------------------------
 # PDFgetX3-like PDF (ELECTRONS)
 # --------------------------------------------------
@@ -289,8 +364,8 @@ def compute_ePDF(
 
     Notes
     -----
-    The normalisation factor ``I_inf`` is estimated as the mean intensity in
-    the top 10 % of the Q range (``q > 0.9 * qmax``).
+    The absolute normalization is fitted on high-Q with an affine model
+    ``alpha*I + beta -> <f^2>`` to reduce sensitivity to residual offsets.
     """
     if qmax is None or qmax > q.max():
         qmax = q.max()
@@ -342,19 +417,11 @@ def compute_ePDF(
     favg = np.interp(q, q_f, favg)
     favg2 = favg**2
 
-    # Estimate absolute scale alpha from high-Q behaviour: alpha*I(Q) -> <f^2>(Q).
-    finite = np.isfinite(Iexp) & np.isfinite(f2avg) & np.isfinite(favg2) & (favg2 > 0)
-    mask_inf = finite & (q > 0.9 * qmax)
-    if np.any(mask_inf):
-        den = np.mean(Iexp[mask_inf])
-        num = np.mean(f2avg[mask_inf])
-    else:
-        den = np.mean(Iexp[finite])
-        num = np.mean(f2avg[finite])
-    alpha = num / den if den != 0 else 1.0
+    # Fit alpha and beta so high-Q obeys alpha*I + beta -> <f^2>.
+    alpha, beta = fit_highq_scale_offset(Iexp, f2avg, favg2, q, qmax)
 
-    # Reduced structure function via S(Q)-1 = (alpha*I - <f^2>) / <f>^2
-    Sminus1 = (alpha * Iexp - f2avg) / np.maximum(favg2, np.finfo(float).eps)
+    # Reduced structure function via S(Q)-1 = (alpha*I + beta - <f^2>) / <f>^2
+    Sminus1 = (alpha * Iexp + beta - f2avg) / np.maximum(favg2, np.finfo(float).eps)
 
     # --- Modified intensity F(Q) ---
     Fm = q * Sminus1
@@ -372,7 +439,12 @@ def compute_ePDF(
     qv = q[mask]
 
     if Lorch:
-        Fv = Fc[mask] * np.sinc(qv / qmax)
+        lorch_window = np.sinc(qv / qmax)
+        # Partial RMS renormalization to limit amplitude bias without over-boosting.
+        w_rms = np.sqrt(np.mean(lorch_window**2))
+        if np.isfinite(w_rms) and w_rms > 0:
+            lorch_window = lorch_window / (w_rms**0.7)
+        Fv = Fc[mask] * lorch_window
     else:
         Fv = Fc[mask]
 
@@ -506,8 +578,8 @@ def compute_xPDF(
 
     Notes
     -----
-    The normalisation factor ``I_inf`` is estimated as the mean intensity in
-    the top 10 % of the Q range (``q > 0.9 * qmax``).
+    The absolute normalization is fitted on high-Q with an affine model
+    ``alpha*I + beta -> <f^2>`` to reduce sensitivity to residual offsets.
     """
     if qmax is None or qmax > q.max():
         qmax = q.max()
@@ -555,19 +627,11 @@ def compute_xPDF(
     favg = np.interp(q, q_f, favg)
     favg2 = favg**2
 
-    # Estimate absolute scale alpha from high-Q behaviour: alpha*I(Q) -> <f^2>(Q).
-    finite = np.isfinite(Iexp) & np.isfinite(f2avg) & np.isfinite(favg2) & (favg2 > 0)
-    mask_inf = finite & (q > 0.9 * qmax)
-    if np.any(mask_inf):
-        den = np.mean(Iexp[mask_inf])
-        num = np.mean(f2avg[mask_inf])
-    else:
-        den = np.mean(Iexp[finite])
-        num = np.mean(f2avg[finite])
-    alpha = num / den if den != 0 else 1.0
+    # Fit alpha and beta so high-Q obeys alpha*I + beta -> <f^2>.
+    alpha, beta = fit_highq_scale_offset(Iexp, f2avg, favg2, q, qmax)
 
-    # Reduced structure function via S(Q)-1 = (alpha*I - <f^2>) / <f>^2
-    Sminus1 = (alpha * Iexp - f2avg) / np.maximum(favg2, np.finfo(float).eps)
+    # Reduced structure function via S(Q)-1 = (alpha*I + beta - <f^2>) / <f>^2
+    Sminus1 = (alpha * Iexp + beta - f2avg) / np.maximum(favg2, np.finfo(float).eps)
 
     # --- Modified intensity F(Q) ---
     Fm = q * Sminus1
@@ -585,7 +649,12 @@ def compute_xPDF(
     qv = q[mask]
 
     if Lorch:
-        Fv = Fc[mask] * np.sinc(qv / qmax)
+        lorch_window = np.sinc(qv / qmax)
+        # Partial RMS renormalization to limit amplitude bias without over-boosting.
+        w_rms = np.sqrt(np.mean(lorch_window**2))
+        if np.isfinite(w_rms) and w_rms > 0:
+            lorch_window = lorch_window / (w_rms**0.7)
+        Fv = Fc[mask] * lorch_window
     else:
         Fv = Fc[mask]
 

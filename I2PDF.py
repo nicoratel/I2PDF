@@ -341,6 +341,7 @@ with tab2:
             compute_avg_scattering_factor,
             compute_f2avg,
             fit_polynomial_background,
+            fit_highq_scale_offset,
         )
         
         # Display plots in RIGHT column
@@ -374,22 +375,15 @@ with tab2:
             if I_ref is not None:
                 Iexp_corrected = Iexp_corrected - bgscale_int * I_ref
 
-            finite = (
-                np.isfinite(Iexp_corrected)
-                & np.isfinite(f2avg_interp)
-                & np.isfinite(favg2_interp)
-                & (favg2_interp > 0)
+            alpha, beta = fit_highq_scale_offset(
+                Iexp_corrected,
+                f2avg_interp,
+                favg2_interp,
+                q,
+                qmax_int,
             )
-            mask_inf = finite & (q > 0.9 * qmax_int)
-            if np.any(mask_inf):
-                den = np.mean(Iexp_corrected[mask_inf])
-                num = np.mean(f2avg_interp[mask_inf])
-            else:
-                den = np.mean(Iexp_corrected[finite])
-                num = np.mean(f2avg_interp[finite])
-            alpha = num / den if den != 0 else 1.0
 
-            Sminus1 = (alpha * Iexp_corrected - f2avg_interp) / np.maximum(
+            Sminus1 = (alpha * Iexp_corrected + beta - f2avg_interp) / np.maximum(
                 favg2_interp, np.finfo(float).eps
             )
             Fm = q * Sminus1
