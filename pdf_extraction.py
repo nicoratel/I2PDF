@@ -1,6 +1,6 @@
 from matplotlib import pyplot as plt
 #from .lobato_scattering import LobatoScatteringCalculator
-from xpdfsuite.compute_f0 import f0_from_Q, f0_from_k, load_elements_yaml
+from compute_f0 import f0_from_Q, f0_from_k, load_elements_yaml
 import numpy as np
 import re
 from numpy.polynomial import Polynomial
