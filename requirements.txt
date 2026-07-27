@@ -2,3 +2,4 @@ streamlit
 numpy
 matplotlib
 plotly
+PyYAML>=6.0
