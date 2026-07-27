@@ -2,7 +2,7 @@ import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
 from utilities import read_file
-from pdf_extraction import compute_xPDF, compute_ePDF
+from pdf_extraction import compute_xPDF
 
 # Initialize session state variables
 if 'sample_processor' not in st.session_state:
@@ -67,12 +67,7 @@ tab1, tab2 = st.tabs([" Define Sample and Reference", "📈 Extract xPDF"])
 with tab1:
     st.markdown("## ⚙️ Define Experiment")
     # menu déroulant pour type of radiation
-    radiation_type = st.selectbox(
-        "Select radiation type",
-        options=["X-ray", "Electron"],
-        index=0,
-        help="Select the type of radiation used in the experiment."
-    )
+    radiation_type = "X-ray"
     
     # champs pour la longueur d'onde
     wavelength = st.number_input(
@@ -287,23 +282,7 @@ with tab2:
                 Lorch=lorch_int,
                 plot=False
             )
-        elif radiation_type == "Electron":
-            r_pdf, G_pdf = compute_ePDF(
-                q=st.session_state.q_data,
-                Iexp=st.session_state.I_data,
-                composition=st.session_state.composition,
-                Iref=st.session_state.I_ref,
-                bgscale=bgscale_int,
-                qmin=qmin_int,
-                qmax=qmax_int,
-                qmaxinst=qmaxinst_int,
-                rmin=st.session_state.rmin,
-                rmax=st.session_state.rmax,
-                rstep=st.session_state.rstep,
-                rpoly=rpoly_int,
-                Lorch=lorch_int,
-                plot=False
-            )
+        
         # Create CSV content for download before displaying plots
         output_data = np.column_stack((r_pdf, G_pdf))
         import io
@@ -341,7 +320,7 @@ with tab2:
             compute_avg_scattering_factor,
             compute_f2avg,
             fit_polynomial_background,
-            fit_highq_scale_offset,
+            _estimate_high_q_affine_scale,
         )
         
         # Display plots in RIGHT column
@@ -375,18 +354,19 @@ with tab2:
             if I_ref is not None:
                 Iexp_corrected = Iexp_corrected - bgscale_int * I_ref
 
-            alpha, beta = fit_highq_scale_offset(
-                Iexp_corrected,
-                f2avg_interp,
-                favg2_interp,
-                q,
-                qmax_int,
-            )
-
-            Sminus1 = (alpha * Iexp_corrected + beta - f2avg_interp) / np.maximum(
-                favg2_interp, np.finfo(float).eps
-            )
-            Fm = q * Sminus1
+            alpha, beta = _estimate_high_q_affine_scale(
+                q=q,
+                Iexp=Iexp_corrected,
+                f2avg=f2avg_interp,
+                favg=favg_interp,
+                qmax=q.max(),
+                tail_fraction=0.1)
+            
+            S_minus_1 = (alpha * Iexp_corrected + beta - f2avg_interp) / favg2_interp
+            #S_minus_1 = (alpha * Iexp_corrected + beta - f2avg_interp) / np.maximum(
+            #    favg2_interp, np.finfo(float).eps
+            #)
+            Fm = q * S_minus_1
             
             background = fit_polynomial_background(
                 q, Fm, rpoly=rpoly_int, qmin=qmin_int, qmax=qmaxinst_int
