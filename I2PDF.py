@@ -496,5 +496,5 @@ with tab2:
 
 # Footer
 st.markdown("---")
-st.markdown("💡 **scatt2PDF** - Interactive interface for PDF analysis from X-ray/electron scattering data")
+st.markdown("💡 **scatt2PDF** - Interactive interface for PDF analysis from X-ray scattering 1D data")
 st.markdown("Developed by Nicolas Ratel-Ramond - LPCNO-CNRS - 2026")
