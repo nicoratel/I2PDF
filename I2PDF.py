@@ -2,8 +2,8 @@ import warnings
 import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
-from .utilities import read_file
-from .pdf_extraction import compute_xPDF
+from utilities import read_file
+from pdf_extraction import compute_xPDF
 
 # Initialize session state variables
 if 'sample_processor' not in st.session_state:
