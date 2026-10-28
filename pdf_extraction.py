@@ -324,7 +324,7 @@ def _xpdf_core(q, I, f2avg, favg, r, qmin, qmax, qmaxinst, rpoly, Lorch):
         Fv = Fc[mask]
 
     integrand = Fv[None, :] * np.sin(np.outer(r, qv))
-    trapz_func = getattr(np, 'trapezoid', np.trapz)
+    trapz_func = np.trapezoid if hasattr(np, "trapezoid") else np.trapz
     G = (2 / np.pi) * trapz_func(integrand, qv, axis=1)
     return G, Fc
 
