@@ -4,7 +4,8 @@ import numpy as np
 import plotly.graph_objects as go
 from .utilities import read_file
 from .pdf_extraction import compute_xPDF
-import inspect, .pdf_extraction
+import inspect
+import .pdf_extraction
 st.sidebar.write(pdf_extraction.__file__)
 st.sidebar.code(str(inspect.signature(pdf_extraction.compute_xPDF)))
 # Initialize session state variables
