@@ -3,3 +3,4 @@ numpy
 matplotlib
 plotly
 PyYAML>=6.0
+scipy
