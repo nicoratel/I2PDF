@@ -1,3 +1,4 @@
+import warnings
 import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
@@ -240,6 +241,47 @@ with tab2:
             import traceback
             st.error(traceback.format_exc())
     
+    def _optimize_bgscale_callback():
+        """Run the auto-bgscale search and write the result into the slider state.
+
+        Executed as an ``on_click`` callback, i.e. before the next script run,
+        which is the only moment a widget's session_state value can be changed.
+        """
+        ss = st.session_state
+        try:
+            r_peak, r_tol = float(ss.r_peak_input), float(ss.r_tol_input)
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                _, _, bg = compute_xPDF(
+                    q=ss.q_data,
+                    Iexp=ss.I_data,
+                    composition=ss.composition,
+                    Iref=ss.I_ref,
+                    bgscale="auto",
+                    qmin=ss.qmin_slider,
+                    qmax=ss.qmax_slider,
+                    qmaxinst=ss.qmaxinst_slider,
+                    rmin=max(0.0, r_peak - r_tol),
+                    rmax=r_peak + r_tol,
+                    rstep=0.05,  # the final G(r) is not used here
+                    rpoly=ss.rpoly_slider,
+                    Lorch=ss.lorch_checkbox,
+                    r_peak=r_peak,
+                    r_tol=r_tol,
+                    bg_bounds=(0.0, 2.5),  # same range as the slider
+                    return_bgscale=True,
+                )
+            bg = round(float(np.clip(bg, 0.0, 2.5)), 2)  # slider step = 0.01
+            ss.bgscale_slider = bg
+            ss.bg_opt_msg = {
+                "level": "success",
+                "text": f"bgscale = {bg:.2f} (peak maximised at {r_peak:.2f} ± {r_tol:.2f} Å)",
+            }
+            ss.bg_opt_warnings = [str(w.message) for w in caught]
+        except Exception as e:
+            ss.bg_opt_msg = {"level": "error", "text": f"Optimization failed: {e}"}
+            ss.bg_opt_warnings = []
+
     # Display interactive controls if data is ready
     if hasattr(st.session_state, 'data_ready') and st.session_state.data_ready:
         st.subheader("⚙️ Interactive Parameters")
@@ -254,6 +296,35 @@ with tab2:
         # Put all sliders in LEFT column
         with col_controls:
             st.markdown("### 🎚️ Parameters")
+            # --- Automatic bgscale optimisation (button -> sets the slider) ---
+            has_ref = st.session_state.I_ref is not None
+            col_peak, col_tol = st.columns(2)
+            with col_peak:
+                st.number_input(
+                    "Peak r (Å)", value=2.8, min_value=0.5, max_value=20.0, step=0.1,
+                    format="%.2f", key="r_peak_input", disabled=not has_ref,
+                    help="Expected position of the PDF peak to maximise.",
+                )
+            with col_tol:
+                st.number_input(
+                    "Tolerance (Å)", value=0.2, min_value=0.02, max_value=2.0, step=0.05,
+                    format="%.2f", key="r_tol_input", disabled=not has_ref,
+                    help="Half-width of the search window around the peak position.",
+                )
+            st.button(
+                "🎯 Optimize bgscale", key="optimize_bg_button",
+                on_click=_optimize_bgscale_callback, disabled=not has_ref,
+                help="Finds the bgscale that maximises the PDF peak, using the current "
+                     "qmin / qmax / qmaxinst / rpoly / Lorch settings, then moves the slider.",
+            )
+            if not has_ref:
+                st.caption("⚠️ Optimization needs a reference file.")
+            _msg = st.session_state.get("bg_opt_msg")
+            if _msg:
+                getattr(st, _msg["level"])(_msg["text"])
+                for _w in st.session_state.get("bg_opt_warnings", []):
+                    st.warning(_w)
+
             bgscale_int = st.slider("bgscale", 0.0, 2.5, _default_bgscale, 0.01, key="bgscale_slider")
             qmin_int = st.slider("qmin (Å⁻¹)", 0.1, q_max_data, _default_qmin, 0.1, key="qmin_slider")
             qmax_int = st.slider("qmax (Å⁻¹)", float(np.min(st.session_state.q_data)), q_max_data, _default_qmax, 0.1, key="qmax_slider")
@@ -496,5 +567,5 @@ with tab2:
 
 # Footer
 st.markdown("---")
-st.markdown("💡 **scatt2PDF** - Interactive interface for PDF analysis from X-ray scattering 1D data")
+st.markdown("💡 **scatt2PDF** - Interactive interface for PDF analysis from X-ray/electron scattering data")
 st.markdown("Developed by Nicolas Ratel-Ramond - LPCNO-CNRS - 2026")
